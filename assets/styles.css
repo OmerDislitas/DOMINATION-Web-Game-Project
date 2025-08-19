@@ -1,0 +1,605 @@
+@import url('https://fonts.googleapis.com/css2?family=Electrolize&family=Jersey+10&family=Roboto:ital,wght@0,100..900;1,100..900&display=swap');
+
+.bg {
+    background-color: #645133;
+}
+
+* {}
+
+body {
+    width: 100%;
+    height: 100%;
+    background-color: #645133;
+    margin: 0;
+    padding: 0;
+}
+canvas {
+  background-color: #eef;
+  display: block;
+  margin: auto;
+  border: 1px solid #333;
+}
+
+.screen {
+    display: none;
+}
+
+.screen.active {
+    display: block;
+}
+
+.screen-container {
+    display: flex;
+    justify-content: center;
+    min-height: 100vh;
+    align-items: center;
+    width: 100%;
+    height: 100%;
+}
+
+.panel-outer {
+    width: 70vw;
+    height: 90vh;
+    padding: 20px;
+    background-color: #EBB259;
+    border-radius: 100px;
+    box-sizing: border-box;
+}
+
+.panel-inner {
+    height: 100%;
+    background-color: #FFD696;
+    border-radius: 85px;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 2vh;
+}
+
+
+
+.panel-header {
+    text-align: center;
+    font-weight: lighter;
+    left: 50%;
+    font-family: "Jersey 10";
+    font-size: 150px;
+    color: #B57B20;
+    margin: 0 auto;
+}
+
+.panel-container {
+    display: flex;
+    margin: 0 auto;
+    align-items: center;
+    justify-content: center;
+    width: 70%;
+    font-family: "jersey 10";
+    font-size: 100px;
+    color: #B57B20;
+}
+
+.input-group {
+    align-items: center;
+    display: flex;
+    flex-direction: row;
+    gap: 20px;
+}
+
+.input-group span {
+    font-family: "jersey 10";
+    font-size: 100px;
+    color: #B57B20;
+}
+
+.input-group input {
+    width: 100%;
+    height: 90px;
+    font-family: "jersey 10";
+    border: none;
+    font-size: 100px;
+    border-radius: 20px;
+    padding-left: 20px;
+    outline: none;
+    color: #B57B20;
+    caret-color: #B57B20;
+    /* örnek: kahverengi */
+    caret: #B57B20;
+
+    placeholder {
+        color: #B57B20;
+    }
+}
+
+.login-button-group {
+    padding-top: 30px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    width: 100%;
+    gap: 30px;
+}
+
+.login-button {
+    width: 70%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-family: "jersey 10";
+    font-size: 100px;
+    color: #B57B20;
+    background-color: #F2A835;
+    border: none;
+    border-radius: 20px;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+}
+
+.login-button:hover {
+    background-color: transparent;
+}
+
+.up-line {
+    padding: 0;
+    margin: 0;
+    position: relative;
+    left: 50%;
+    transform: translateX(-50%);
+    border: none;
+    width: 70vw;
+    height: 20px;
+    background-color: #EBB259;
+    margin: 0 auto;
+}
+
+.rooms-panel-header {
+    text-align: center;
+    font-weight: lighter;
+    left: 50%;
+    font-family: "Jersey 10";
+    font-size: 100px;
+    color: #B57B20;
+    margin: 0 auto;
+    display: flex;
+    justify-content: space-between;
+}
+
+.larger-up-line {
+    padding: 0;
+    margin: 0;
+    position: relative;
+    left: 50%;
+    transform: translateX(-50%);
+    border: none;
+    width: 105%;
+    height: 20px;
+    background-color: #EBB259;
+    margin: 0 auto;
+}
+
+.up-content {
+    color: #B57B20;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.up-content i {
+    padding-left: 30px;
+    font-size: 70px;
+    cursor: pointer;
+}
+
+.back-button {
+    background: none;
+    border: none;
+    color: #B57B20;
+    font-size: 60px;
+    cursor: pointer;
+    transition: color 0.3s ease;
+}
+
+.rooms-panel-inner {
+    height: 100%;
+    background-color: #FFD696;
+    border-radius: 85px;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+
+}
+
+.rooms-content {
+    padding-right: 20px;
+    flex-direction: column;
+    padding-top: 20px;
+    gap: 20px;
+    align-items: center;
+}
+
+.room-scroll-panel {
+    height: calc(80vh - 20vh);
+
+    overflow-y: auto;
+
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+}
+
+.room-scroll-panel::-webkit-scrollbar {
+    width: 20px;
+}
+
+.room-scroll-panel::-webkit-scrollbar-thumb {
+    background-color: #D9933D;
+    border-radius: 10px;
+}
+
+.room-entry-item {
+    padding-left: 30px;
+    padding-right: 30px;
+    width: 90%;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-family: "jersey 10";
+    font-size: 100px;
+    color: #B57B20;
+    background-color: #F2A835;
+    border: none;
+    border-radius: 20px;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+}
+
+.join-button-group {
+    padding-top: 10px;
+}
+
+.room-entry-item:hover {
+    background-color: transparent;
+}
+
+.room-name-group {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    align-items: center;
+    display: flex;
+    flex-direction: column;
+}
+
+
+
+.room-name-group span {
+    font-family: "jersey 10";
+    font-size: 100px;
+    color: #B57B20;
+}
+
+.room-name-group input {
+    width: 96%;
+    height: 90px;
+    font-family: "jersey 10";
+    border: none;
+    font-size: 100px;
+    border-radius: 20px;
+    padding-left: 20px;
+    outline: none;
+    color: #B57B20;
+    caret-color: #B57B20;
+    /* örnek: kahverengi */
+    caret: #B57B20;
+
+    placeholder {
+        color: #B57B20;
+    }
+}
+
+.create-room {
+    display: flex;
+    flex-direction: column;
+    padding-top: 20px;
+}
+
+.capacity-selector {
+    padding-top: 2vh;
+    display: flex;
+    width: 70%;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    font-family: "Jersey 10";
+    font-size: 100px;
+    color: #B57B20;
+}
+
+.capacity-btn {
+    align-items: center;
+    background-color: #F2A835;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 20px;
+    padding: 5px 10px;
+    display: block;
+    color: #B57B20;
+}
+
+.checkbox-container {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+    user-select: none;
+    font-family: inherit;
+}
+
+.checkbox-box {
+    width: 50px;
+    height: 50px;
+    border: 10px solid #EBB259;
+    background-color: #f4d087;
+    border-radius: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.checkmark {
+    font-size: 70px;
+    color: #B57B20;
+    display: none;
+    font-weight: bold;
+}
+
+.checkbox-box.active .checkmark {
+    display: block;
+}
+
+.create-room-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+
+.larger-panel-outer {
+    width: 200vh;
+    height: 70vhpx;
+    padding: 20px;
+    background-color: #EBB259;
+    border-radius: 100px;
+    box-sizing: border-box;
+}
+
+.larger-panel-inner {
+    height: 85vh;
+    background-color: #FFD696;
+    border-radius: 85px;
+    padding: 20px;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+}
+
+.larger-up-content {
+    color: #B57B20;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.larger-up-content i {
+    padding-left: 10px;
+    font-size: 70px;
+    cursor: pointer;
+}
+
+
+
+.room-entry-item {
+    padding-left: 30px;
+    padding-right: 30px;
+    width: 90%;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-family: "jersey 10";
+    font-size: 100px;
+    color: #B57B20;
+    background-color: #F2A835;
+    border: none;
+    border-radius: 20px;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+}
+
+.waiting-room-container {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    padding-right: 30px;
+}
+
+.player-waiting {
+
+    width: 70vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-family: "jersey 10";
+    font-size: 100px;
+    color: #B57B20;
+    background-color: #F2A835;
+    border: none;
+    border-radius: 20px;
+    cursor: pointer;
+}
+
+.player-scroll-panel {
+    padding-top: 20px;
+    width: 80vh;
+    max-height: 45vh;
+    overflow-y: auto;
+    padding-right: 5px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 30px;
+}
+
+.player-scroll-panel::-webkit-scrollbar {
+    width: 12px;
+}
+
+.player-scroll-panel::-webkit-scrollbar-thumb {
+    background-color: #D9933D;
+    border-radius: 10px;
+}
+
+.waiting-room-right {
+    padding-left: 20px;
+}
+
+.jersey-text {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-family: "jersey 10";
+    font-size: 100px;
+    color: #B57B20;
+}
+
+.color-list {
+    padding-right: 30px;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+    margin-top: 10px;
+    width: 100%;
+}
+
+.color-element {
+    width: 100%;
+    height: 105px;
+    border-radius: 8px;
+    cursor: pointer;
+}
+
+.red {
+    background-color: #A81B1B;
+}
+
+.orange {
+    background-color: #EE6B19;
+}
+
+.yellow {
+    background-color: #EFD22B;
+}
+
+.green {
+    background-color: #A3BC16;
+}
+
+.blue {
+    background-color: #14BBC7;
+}
+
+.purple {
+    background-color: #5253AC;
+}
+
+.magenta {
+    background-color: #BC1EA7;
+}
+
+.pink {
+    background-color: #EA486B;
+}
+
+.waiting-room-panel-down-container {
+    padding-top: 30px;
+    padding-left: 30px;
+    padding-right: 30px;
+    display: flex;
+    flex-direction: row;
+    gap: 30px;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.start-button {
+
+    width: 30%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-family: "jersey 10";
+    font-size: 90px;
+    color: #B57B20;
+    background-color: #F2A835;
+    border: none;
+    border-radius: 20px;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+
+}
+
+.start-button:hover {
+    background-color: transparent;
+}
+#build-menu {
+  position: absolute;
+  bottom: 20px;
+  left: 20px; /* Sol alt köşe */
+  background: #ddd;
+  padding: 8px 16px;
+  border-radius: 8px;
+  box-shadow: 0 0 10px rgba(0,0,0,0.3);
+}
+
+#build-menu button {
+  font-size: 20px;
+  margin: 0 8px;
+  cursor: pointer;
+}
+
+#unit-menu {
+  position: absolute;
+  bottom: 20px;
+  right: 20px; /* Sağ alt köşe */
+  background: #ddd;
+  padding: 8px 16px;
+  border-radius: 8px;
+  box-shadow: 0 0 10px rgba(0,0,0,0.3);
+}
+
+#unit-menu button {
+  font-size: 20px;
+  margin: 0 8px;
+  cursor: pointer;
+}
+
+.hidden {
+  display: none;
+}
+
+/* object-navigator gerekirse flex olabilir ama konumları absolute olduğundan bu şart değil */
+.object-navigator {
+  position: relative;
+}
+#build-menu button img{
+    width: 32px;
+    height: 32px;
+}
+#unit-menu button img{
+    width: 32px;
+    height: 32px;
+}
