@@ -1,9 +1,14 @@
 document.addEventListener('DOMContentLoaded', () => {
+  // Add these new variables at the top of your DOMContentLoaded event listener
   let animatingUnits = new Map(); // key: "row,col", value: animation data
+  let animatingCircles = new Map(); // key: unique ID, value: circle animation data
   let animationId = null;
+  let circleIdCounter = 0;
 
   // Animation configuration
+  // Animation configuration
   const ANIMATION_DURATION = 300; // milliseconds
+  const CIRCLE_FADE_DURATION = 300; // milliseconds for circle fade-in
   const EASING_FACTOR = 0.15; // for smooth easing (lower = smoother, higher = faster)
 
   const canvas = document.getElementById('myCanvas');
@@ -41,11 +46,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const objectImages = {
     house: new Image(),
+    castle: new Image(),
     tower: new Image(),
     strong_tower: new Image()
   };
-
   objectImages.house.src = 'assets/img/house.png';
+  objectImages.castle.src = 'assets/img/castle.png';
   objectImages.tower.src = 'assets/img/tower.png';
   objectImages.strong_tower.src = 'assets/img/strong_tower.png';
 
@@ -55,6 +61,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const objectSizes = {
     house: 48,
+    castle: 48,
     tower: 48,
     strong_tower: 48,
     peasant: 48,
@@ -177,7 +184,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const btn = e.target.closest('button');
     if (!btn || !selectedTile) return;
 
-    const obj = btn.dataset.object; // "house" | "tower" | "strong_tower"
+    const obj = btn.dataset.object; // "castle" | "tower" | "strong_tower"
     window.landData = window.landData.map(line => {
       const parts = line.trim().split(/\s+/);
       const [r, c, p] = parts;
@@ -246,6 +253,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   window.onload = () => {
     updateAllLandProtections(); // Initialize protections
+    initializecastleDistribution();
     drawMap();
   };
 
@@ -435,6 +443,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const centerY = y * scale + offsetY;
 
       ctx.beginPath();
+
       ctx.strokeStyle = 'rgba(255, 0, 0, 0.4)';
       ctx.lineWidth = 8;
       ctx.arc(centerX, centerY, tileSize * scale * 0.5, 0, Math.PI * 2);
@@ -448,31 +457,52 @@ document.addEventListener('DOMContentLoaded', () => {
     return t * (2 - t);
   }
 
-  // Function to start unit animation
-  function animateUnitMovement(fromTile, toTile, unitType) {
-    const fromPos = hexToPixel(fromTile.row, fromTile.col);
-    const toPos = hexToPixel(toTile.row, toTile.col);
+  function drawAnimatedCircles(currentTime) {
+    const toDelete = [];
 
-    const startX = fromPos.x * scale + offsetX;
-    const startY = fromPos.y * scale + offsetY;
-    const endX = toPos.x * scale + offsetX;
-    const endY = toPos.y * scale + offsetY;
+    animatingCircles.forEach((circleData, circleId) => {
+      const elapsed = currentTime - circleData.startTime;
 
-    const unitKey = `${toTile.row},${toTile.col}`;
+      if (elapsed >= circleData.duration) {
+        // Animation complete, mark for deletion
+        toDelete.push(circleId);
+        return;
+      }
 
-    animatingUnits.set(unitKey, {
-      startTime: Date.now(),
-      startX: startX,
-      startY: startY,
-      endX: endX,
-      endY: endY,
-      type: unitType
+      // Calculate opacity based on animation type
+      const progress = elapsed / circleData.duration;
+      let opacity;
+
+      if (circleData.animationType === 'fadeIn') {
+        opacity = easeOutQuad(progress); // 0 to 1
+      } else if (circleData.animationType === 'fadeOut') {
+        opacity = 1 - easeOutQuad(progress); // 1 to 0
+      } else if (circleData.animationType === 'pulse') {
+        // Fade in then fade out
+        if (progress < 0.5) {
+          opacity = easeOutQuad(progress * 2); // First half: 0 to 1
+        } else {
+          opacity = 1 - easeOutQuad((progress - 0.5) * 2); // Second half: 1 to 0
+        }
+      }
+
+      // Apply color and opacity
+      const color = circleData.color || [255, 0, 0]; // Default red
+      ctx.beginPath();
+      ctx.arc(circleData.x, circleData.y, circleData.radius * scale, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(${color[0]}, ${color[1]}, ${color[2]}, ${opacity})`;
+      ctx.fill();
+
+      // Optional: Add a stroke
+      if (circleData.stroke) {
+        ctx.strokeStyle = `rgba(${color[0]}, ${color[1]}, ${color[2]}, ${opacity * 0.8})`;
+        ctx.lineWidth = circleData.strokeWidth || 2;
+        ctx.stroke();
+      }
     });
 
-    // Start animation loop if not already running
-    if (!animationId) {
-      startAnimationLoop();
-    }
+    // Clean up completed animations
+    toDelete.forEach(id => animatingCircles.delete(id));
   }
 
   // Animation loop
@@ -489,6 +519,9 @@ document.addEventListener('DOMContentLoaded', () => {
   }
   function drawUnits() {
     const currentTime = Date.now();
+
+    // Draw animated circles first (so they appear behind units)
+
 
     window.unitData.forEach(line => {
       const [row, col, player, type] = line.trim().split(/\s+/);
@@ -524,6 +557,64 @@ document.addEventListener('DOMContentLoaded', () => {
       drawUnit(centerX, centerY, type);
     });
   }
+  // Function to draw animated circles
+
+  // Function to create an animated red circle
+  function createAnimatedCircle(x, y, radius = 20, withStroke = false) {
+    const circleId = ++circleIdCounter;
+
+    animatingCircles.set(circleId, {
+      x: x,
+      y: y,
+      radius: radius,
+      stroke: withStroke,
+      startTime: Date.now()
+    });
+
+    // Start animation loop if not already running
+    if (!animationId) {
+      startAnimationLoop();
+    }
+
+    return circleId; // Return ID in case you want to modify or cancel this specific circle
+  }
+
+  // Function to create a circle at a specific tile
+  function createCircleAtTile(tile, radius = 20, withStroke = false) {
+    const { x, y } = hexToPixel(tile.row, tile.col);
+    const screenX = x * scale + offsetX;
+    const screenY = y * scale + offsetY;
+
+    return createAnimatedCircle(screenX, screenY, radius, withStroke);
+  }
+
+
+  function animateUnitMovement(fromTile, toTile, unitType) {
+    const fromPos = hexToPixel(fromTile.row, fromTile.col);
+    const toPos = hexToPixel(toTile.row, toTile.col);
+
+    const startX = fromPos.x * scale + offsetX;
+    const startY = fromPos.y * scale + offsetY;
+    const endX = toPos.x * scale + offsetX;
+    const endY = toPos.y * scale + offsetY;
+
+    const unitKey = `${toTile.row},${toTile.col}`;
+
+    animatingUnits.set(unitKey, {
+      startTime: Date.now(),
+      startX: startX,
+      startY: startY,
+      endX: endX,
+      endY: endY,
+      type: unitType
+    });
+
+    // Start animation loop if not already running
+    if (!animationId) {
+      startAnimationLoop();
+    }
+  }
+
 
   function drawUnit(x, y, type) {
     const img = unitImages[type];
@@ -629,6 +720,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
           // Start animation before updating data
           animateUnitMovement(selectedUnit, clickedTile, unitType);
+
+          // Create a red circle at the destination to show movement
+          createCircleAtTile(clickedTile, 25, true);
 
           window.unitData = window.unitData.map(line => {
             const [r, c, p, t] = line.split(' ');
@@ -749,6 +843,7 @@ document.addEventListener('DOMContentLoaded', () => {
       }
 
       // Düşman yoksa ve hedef BOŞSA → HAREKET
+      // In the final movement section for empty tiles:
       if (!thereIsUnit) {
         const reachable = getReachableTiles(selectedUnit, 4, attackerOwner);
         const canReach = reachable.some(t => t.row === clickedTile.row && t.col === clickedTile.col);
@@ -816,14 +911,15 @@ document.addEventListener('DOMContentLoaded', () => {
       unitMenu.classList.remove('hidden');
       buildMenu.classList.remove('hidden');
     }
-
+    initializecastleDistribution();
     drawMap();
   });
 
   // Ekran yüklendiğinde çiz
   window.addEventListener('DOMContentLoaded', () => {
-    updateAllLandProtections(); // Initialize protections
+
     drawMap();
+
   });
 
   canvas.addEventListener('mousedown', function (e) {
@@ -905,13 +1001,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Move these functions inside the event listener scope or make them access global unitData
   function setLandOwner(tile, newOwner) {
-    window.landData.forEach((line, i) => {
-      const [r, c, p, ...rest] = line.trim().split(/\s+/);
+    window.landData = window.landData.map(line => {
+      const parts = line.trim().split(/\s+/);
+      const [r, c, oldOwner, ...rest] = parts;
       if (parseInt(r) === tile.row && parseInt(c) === tile.col) {
-        window.landData[i] = `${r} ${c} ${newOwner} ${rest.join(' ')}`.trim();
+        // Sahip değişiminde house'ı kaldır
+        const filtered = rest.filter(tok => tok !== 'castle');
+        return `${r} ${c} ${newOwner} ${filtered.join(' ')}`.trim();
       }
+      return line;
     });
   }
+
 
 });
 
@@ -1097,8 +1198,7 @@ function recomputeProtection() {
     const ut = parts[3];              // type: peasant|spearman|...
     const power = Number(window.unitPower?.[ut] ?? 0);
 
-    // Debug logging
-    console.log(`Processing unit: ${ut} at (${ur},${uc}) player ${up} power ${power}`);
+
 
     // Handle unknown unit types
     if (!power && window.unitPower?.[ut] === undefined) {
@@ -1110,65 +1210,226 @@ function recomputeProtection() {
     neighbors.forEach(nb => {
       const neighborOwner = getLandOwner(nb);
 
-      // Debug logging
-      console.log(`  Checking neighbor (${nb.row},${nb.col}): owner=${neighborOwner}, unit_player=${up}`);
-
-      // ONLY protect lands owned by the same player as the unit
-      if (neighborOwner !== null && neighborOwner === up) {
-        const key = `${nb.row},${nb.col}`;
-        const currentProtection = map[key] ?? 0;
-        if (power > currentProtection) {
-          console.log(`    Updating protection from ${currentProtection} to ${power}`);
-          map[key] = power;
-        }
-      }
     });
-  });
-
-  // ADDITIONAL CHECK: Special handling for level 1 (peasant) and level 4 (knight) soldiers
-  console.log("=== ADDITIONAL LEVEL 1 & 4 CHECK ===");
-  window.unitData.forEach(line => {
-    const parts = line.trim().split(/\s+/);
-    const ur = +parts[0], uc = +parts[1];
-    const up = parseInt(parts[2]);    // unit player
-    const ut = parts[3];              // type
-    const power = Number(window.unitPower?.[ut] ?? 0);
-
-    // Only check for level 1 (peasant) and level 4 (knight) units
-    if (power === 1 || power === 4) {
-      console.log(`SPECIAL CHECK: ${ut} (power ${power}) at (${ur},${uc}) player ${up}`);
-
-      const neighbors = getNeighbors({ row: ur, col: uc });
-      neighbors.forEach(nb => {
-        const neighborOwner = getLandOwner(nb);
-
-        console.log(`  SPECIAL: Checking neighbor (${nb.row},${nb.col}): owner=${neighborOwner}, unit_player=${up}`);
-
-        // Force update if same owner
-        if (neighborOwner !== null && neighborOwner === up) {
-          const key = `${nb.row},${nb.col}`;
-          const currentProtection = map[key] ?? 0;
-
-          // Force set the protection level
-          if (power > currentProtection) {
-            console.log(`    SPECIAL UPDATE: Setting protection to ${power} (was ${currentProtection})`);
-            map[key] = power;
-          } else {
-            console.log(`    SPECIAL: Already protected at level ${currentProtection}, not changing`);
-          }
-        }
-      });
-    }
   });
 
   window.protectedMap = map;
 
-  // Debug: log final protection map
-  console.log('Final protection map:', window.protectedMap);
+
 }
 
-function getProtectionAt(tile) {
-  const protection = window.protectedMap[`${tile.row},${tile.col}`] ?? 0;
-  console.log(`Getting protection for (${tile.row},${tile.col}): ${protection}`);
-  return protection;
+
+function findConnectedRegions() {
+  const visited = new Set();
+  const regions = new Map(); // playerId -> [region1, region2, ...]
+
+  window.landData.forEach(line => {
+    const [row, col, player] = line.trim().split(/\s+/);
+    const r = parseInt(row);
+    const c = parseInt(col);
+    const p = parseInt(player);
+    const key = `${r},${c}`;
+
+    if (visited.has(key)) return;
+
+    // Find all tiles connected to this one with the same player
+    const region = findConnectedTilesOfSamePlayer({ row: r, col: c }, p, visited);
+
+    if (region.length >= 2) { // Only consider regions with at least 2 tiles
+      if (!regions.has(p)) {
+        regions.set(p, []);
+      }
+      regions.get(p).push(region);
+    }
+  });
+
+  return regions;
+}
+
+// Helper function to find all tiles connected to a starting tile with the same player
+function findConnectedTilesOfSamePlayer(startTile, targetPlayer, visited) {
+  const region = [];
+  const queue = [startTile];
+  const regionVisited = new Set();
+
+  while (queue.length > 0) {
+    const current = queue.shift();
+    const key = `${current.row},${current.col}`;
+
+    if (regionVisited.has(key)) continue;
+    regionVisited.add(key);
+    visited.add(key);
+
+    // Check if this tile belongs to the target player
+    const owner = getLandOwner(current);
+    if (owner !== targetPlayer) continue;
+
+    region.push(current);
+
+    // Add neighbors to queue
+    const neighbors = getNeighbors(current);
+    neighbors.forEach(neighbor => {
+      const neighborKey = `${neighbor.row},${neighbor.col}`;
+      if (!regionVisited.has(neighborKey)) {
+        const neighborOwner = getLandOwner(neighbor);
+        if (neighborOwner === targetPlayer) {
+          queue.push(neighbor);
+        }
+      }
+    });
+  }
+
+  return region;
+}
+
+// Function to check if a region already has a castle
+function regionHascastle(region) {
+  return region.some(tile => {
+    const line = window.landData.find(l => {
+      const [r, c] = l.trim().split(/\s+/);
+      return parseInt(r) === tile.row && parseInt(c) === tile.col;
+    });
+    if (!line) return false;
+    const parts = line.trim().split(/\s+/);
+    return parts[3] === 'castle';
+  });
+}
+
+// Function to assign a castle to a random tile in a region
+function assigncastleToRegion(region) {
+  // Filter out tiles that already have objects
+  const availableTiles = region.filter(tile => {
+    const line = window.landData.find(l => {
+      const [r, c] = l.trim().split(/\s+/);
+      return parseInt(r) === tile.row && parseInt(c) === tile.col;
+    });
+    if (!line) return false;
+    const parts = line.trim().split(/\s+/);
+    return parts.length <= 3; // No object assigned yet
+  });
+
+  if (availableTiles.length === 0) return false; // No available tiles
+
+  // Pick a random tile from available tiles
+  const randomIndex = Math.floor(Math.random() * availableTiles.length);
+  const selectedTile = availableTiles[randomIndex];
+
+  // Add castle to the selected tile
+  window.landData = window.landData.map(line => {
+    const parts = line.trim().split(/\s+/);
+    const [r, c, p] = parts;
+    if (parseInt(r) === selectedTile.row && parseInt(c) === selectedTile.col) {
+      return `${r} ${c} ${p} castle`;
+    }
+    return line;
+  });
+
+  return true;
+}
+
+// Function to remove castles from regions that no longer exist or are too small
+function removeInvalidcastles() {
+  const validRegions = findConnectedRegions();
+  const allValidTiles = new Set();
+
+  // Collect all tiles that belong to valid regions
+  validRegions.forEach(playerRegions => {
+    playerRegions.forEach(region => {
+      region.forEach(tile => {
+        allValidTiles.add(`${tile.row},${tile.col}`);
+      });
+    });
+  });
+
+  // Remove castles from tiles that are not in valid regions
+  window.landData = window.landData.map(line => {
+    const parts = line.trim().split(/\s+/);
+    const [r, c, p, obj] = parts;
+    const key = `${r},${c}`;
+
+    if (obj === 'castle' && !allValidTiles.has(key)) {
+      // This castle is on an invalid tile, remove it
+      return `${r} ${c} ${p}`;
+    }
+    return line;
+  });
+}
+
+// Main function to distribute castles after each move
+function distributecastles() {
+
+  // First, remove any castles from invalid regions
+  removeInvalidcastles();
+
+  // Find all connected regions
+  const regions = findConnectedRegions();
+
+  regions.forEach((playerRegions, playerId) => {
+    console.log(`Player ${playerId} has ${playerRegions.length} regions`);
+
+    playerRegions.forEach((region, index) => {
+      console.log(`  Region ${index + 1}: ${region.length} tiles`);
+
+      // Check if this region already has a castle
+      if (!regionHascastle(region)) {
+        console.log(`    Assigning castle to region ${index + 1}`);
+        const success = assigncastleToRegion(region);
+        if (!success) {
+          console.log(`    Failed to assign castle to region ${index + 1}`);
+        }
+      } else {
+        console.log(`    Region ${index + 1} already has a castle`);
+      }
+    });
+  });
+}
+
+// Function to handle territory splitting (call this after land capture)
+function handleTerritoryBridge(capturedTile, originalOwner) {
+  console.log(`Handling territory split at (${capturedTile.row}, ${capturedTile.col}) from player ${originalOwner}`);
+
+  // Find all remaining regions of the original owner
+  const regions = findConnectedRegions();
+  const affectedPlayerRegions = regions.get(originalOwner) || [];
+
+  // Check each region to see if it needs a castle
+  affectedPlayerRegions.forEach((region, index) => {
+    if (!regionHascastle(region) && region.length >= 2) {
+      console.log(`Assigning castle to newly split region ${index + 1} of player ${originalOwner}`);
+      assigncastleToRegion(region);
+    }
+  });
+}
+
+// Enhanced function to integrate castle distribution with existing game mechanics
+function integratecastleDistribution() {
+  // Call distributecastles after any land change
+  const originalSetLandOwner = setLandOwner;
+
+  window.setLandOwner = function (tile, newOwner) {
+    const oldOwner = getLandOwner(tile);
+    originalSetLandOwner(tile, newOwner);
+
+    // Handle territory splitting for the old owner
+    if (oldOwner !== null && oldOwner !== newOwner) {
+      handleTerritoryBridge(tile, oldOwner);
+    }
+
+    // Redistribute castles for all players
+    distributecastles();
+
+    // Update protections after castle changes
+    if (typeof updateAllLandProtections === 'function') {
+      updateAllLandProtections();
+    }
+  };
+}
+
+// Initialize castle distribution system
+function initializecastleDistribution() {
+  console.log("Initializing castle distribution system...");
+  // Distribute castles for the initial game state
+  distributecastles();
+  // Integrate with existing game mechanics
+  integratecastleDistribution();
 }

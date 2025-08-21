@@ -13,15 +13,17 @@ body {
     margin: 0;
     padding: 0;
 }
+
 canvas {
-  background-color: #eef;
-  display: block;
-  margin: auto;
-  border: 1px solid #333;
+    background-color: #eef;
+    display: block;
+    margin: auto;
+    border: 1px solid #333;
 }
 
 .screen {
     display: none;
+    margin-bottom: 50px;
 }
 
 .screen.active {
@@ -555,51 +557,82 @@ canvas {
 .start-button:hover {
     background-color: transparent;
 }
+
 #build-menu {
-  position: absolute;
-  bottom: 20px;
-  left: 20px; /* Sol alt köşe */
-  background: #ddd;
-  padding: 8px 16px;
-  border-radius: 8px;
-  box-shadow: 0 0 10px rgba(0,0,0,0.3);
+    padding: 0;
+    margin: 0;
+    position: absolute;
+    bottom: 20px;
+    left: 20px;
+    /* Sol alt köşe */
+    background: #ddd;
+    padding: 8px 16px;
+    border-radius: 8px;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
 }
 
 #build-menu button {
-  font-size: 20px;
-  margin: 0 8px;
-  cursor: pointer;
+    padding: 0;
+    margin: 0;
+    border-radius: 10px;
+    font-size: 20px;
+    margin: 0 8px;
+    cursor: pointer;
 }
 
 #unit-menu {
-  position: absolute;
-  bottom: 20px;
-  right: 20px; /* Sağ alt köşe */
-  background: #ddd;
-  padding: 8px 16px;
-  border-radius: 8px;
-  box-shadow: 0 0 10px rgba(0,0,0,0.3);
+    padding: 0;
+    margin: 0;
+    position: absolute;
+    bottom: 20px;
+    right: 20px;
+    /* Sağ alt köşe */
+    background: #ddd;
+    padding: 8px 16px;
+    border-radius: 8px;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
 }
 
 #unit-menu button {
-  font-size: 20px;
-  margin: 0 8px;
-  cursor: pointer;
+    border-radius: 10px;
+    padding: 0;
+    margin: 0;
+    font-size: 20px;
+    margin: 0 8px;
+    cursor: pointer;
 }
 
+
 .hidden {
-  display: none;
+    display: none;
 }
 
 /* object-navigator gerekirse flex olabilir ama konumları absolute olduğundan bu şart değil */
 .object-navigator {
-  position: relative;
+    position: relative;
 }
-#build-menu button img{
+
+#build-menu button img {
     width: 32px;
     height: 32px;
 }
-#unit-menu button img{
+
+#unit-menu button img {
     width: 32px;
     height: 32px;
+}
+
+.in-game-header {
+    text-align: center;
+    font-weight: lighter;
+    left: 50%;
+    font-family: "Jersey 10";
+    font-size: 70px;
+    color: #B57B20;
+    margin: 0 auto;
+}
+
+#myCanvas {
+    border: none;
+    border-radius: 20px;
 }
