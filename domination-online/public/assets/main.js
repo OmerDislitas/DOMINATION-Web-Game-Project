@@ -1,15 +1,32 @@
 
 // Sunucuya bağlan
 const socket = io();
+
+// Add connection event handlers for debugging
+socket.on('connect', () => {
+  console.log('Connected to server with ID:', socket.id);
+});
+
+socket.on('disconnect', () => {
+  console.log('Disconnected from server');
+});
+
+socket.on('error', (error) => {
+  console.error('Socket error:', error);
+  alert('Error: ' + error);
+});
+
 function joinRoomFromInput() {
   const code = (document.getElementById('joincode')?.value || '').toUpperCase().trim();
   if (!code) return;
   setPlayerName();
   socket.emit('room:join', { code });
 }
+
 // Oda/oyun mesajları
 socket.on('rooms:list', (rooms) => {
   const panel = document.querySelector('.room-scroll-panel');
+  if (!panel) return;
   panel.innerHTML = '';
   rooms.forEach(r => {
     const btn = document.createElement('button');
@@ -20,37 +37,196 @@ socket.on('rooms:list', (rooms) => {
     panel.appendChild(btn);
   });
 });
+
+
 let currentRoomCode = null;
-// Sunucudan “oda oluşturuldu” cevabı gelince Waiting Room’a geç
+
+// Sunucudan "oda oluşturuldu" cevabı gelince Waiting Room'a geç
 socket.on('room:created', ({ code, room }) => {
   const label = document.querySelector('.jersey-text');
   if (label) label.textContent = 'ROOM CODE: ' + code;
   showScreen('screen-waiting-room');
 });
+
+
+// room:update render'ını genişlet
 socket.on('room:update', (room) => {
+ 
   const panel = document.querySelector('.player-scroll-panel');
-  panel.innerHTML = '';
-  room.players.forEach(p => {
-    const div = document.createElement('div');
-    div.className = 'player-waiting';
-    div.innerHTML = `<i class="bi bi-person-fill"></i><span>${p.name}</span>`;
-    panel.appendChild(div);
+  if (panel) {
+    panel.innerHTML = '';
+    room.players.forEach(p => {
+  const div = document.createElement('div');
+  div.className = 'player-waiting';
+  div.innerHTML = `<i class="bi bi-person-fill"></i><span>${p.name}</span>`;
+
+  //  Renk bilgisini border’a uygula
+  if (p.color) {
+    div.style.boxShadow = `inset 0 0 0 4px ${p.color}`;
+  }
+
+  panel.appendChild(div);
+  const header = document.querySelector('.waiting-room-header');
+  if (header) {
+    header.textContent = `ROOM: ${room.name} (${room.isPrivate ? "PRIVATE" : "NON-PRIVATE"})`;
+  }
+});
+  }
+
+  // kapasite
+  const capEl = document.getElementById('capacity');
+  if (capEl) capEl.textContent = `${room.players.length}/${room.capacity}`;
+
+  //  renk karelerini güncelle
+  const myId = socket.id;
+  const my = room.players.find(p => p.id === myId);
+  const usedColors = new Set(room.players.map(p => p.color).filter(Boolean));
+
+  document.querySelectorAll('.color-element').forEach(el => {
+    const color = el.dataset.color;
+    el.classList.remove('taken', 'selected');
+
+    // başka biri kullanıyorsa 'taken'
+    if (usedColors.has(color)) el.classList.add('taken');
+    // ben kullanıyorsam 'selected' (ve seçiliyken 'taken' görünümünü iptal et)
+    if (my && my.color === color) {
+      el.classList.add('selected');
+      el.classList.remove('taken');
+    }
   });
 });
 
-// Sunucu state’i ilk kez geldiğinde
+
+// Handle successful room join
+// odaya ilk katıldığında verilen otomatik rengi ve kodu göstermek için
+socket.on('room:joined', (room) => {
+  const label = document.querySelector('.jersey-text');
+  if (label) label.textContent = 'ROOM CODE: ' + room.code;
+  showScreen('screen-waiting-room');
+  wireColorPickers();
+
+  const header = document.querySelector('.waiting-room-header');
+  if (header) {
+    header.textContent = `ROOM: ${room.name} (${room.isPrivate ? "PRIVATE" : "NON-PRIVATE"})`;
+  }
+});
+
+// Sunucu state'i ilk kez geldiğinde
 socket.on('game:init', ({ state }) => {
+  console.log('Game initialized with state:', state);
   if (Array.isArray(state.landData) && state.landData.length > 0) {
     window.landData = state.landData; // sunucuda harita varsa onu al
   } // else: yereldeki harita kalsın
-  drawMap && drawMap();
+  if (window.drawMap) window.drawMap();
 });
 
 socket.on('game:update', (patch) => {
+  console.log('Game updated:', patch);
   if (patch.landData) window.landData = patch.landData;
-  drawMap();
+  if (window.drawMap) window.drawMap();
 });
+function wireColorPickers() {
+    document.querySelectorAll('.color-element').forEach(el => {
+      el.addEventListener('click', () => {
+        const color = el.dataset.color;
+        // rezerve edilmişse tıklama işleme
+        if (el.classList.contains('taken') && !el.classList.contains('selected')) return;
+        socket.emit('room:pickColor', { color });
+      });
+    });
+  }
+// Login ekranında oyuncu adını gönder
+function setPlayerName() {
+  const name = document.getElementById('username')?.value || 'Player';
+  socket.emit('login:setName', name);
+}
 
+// "JOIN THE ROOM" tıklanınca
+function goJoinRooms() {
+  setPlayerName();
+  socket.emit('rooms:list');
+  showScreen('screen-join-room');
+}
+
+// "CREATE ROOM" tıklanınca
+function createRoom() {
+  setPlayerName();
+  const roomName = document.getElementById('roomname')?.value || 'ROOM';
+  const capacity = parseInt(document.getElementById('capacity-value')?.innerText || '4', 10);
+  const isPrivate = document.querySelector('.checkbox-box')?.classList.contains('active');
+
+  socket.emit('room:create', { roomName, capacity, isPrivate });
+}
+function leaveRoom() {
+  socket.emit('room:leave');
+  showScreen('screen-login');
+}
+
+// Bekleme odasında START
+function startGame() {
+  console.log('Starting game...');
+  // İlk elde server'a haritayı bir kez yolla (server boşsa set ediyor)
+  socket.emit('game:start', { landData: window.landData });
+  showScreen('screen-game');
+}
+
+function showScreen(screenId) {
+  console.log('Switching to screen:', screenId);
+  // Tüm ekranlardan "active" sınıfını kaldır
+  const screens = document.querySelectorAll('.screen');
+  screens.forEach(screen => screen.classList.remove('active'));
+
+  // Sadece istenen ekrana "active" sınıfı ekle
+  const targetScreen = document.getElementById(screenId);
+  if (targetScreen) {
+    targetScreen.classList.add('active');
+  } else {
+    console.error('Screen not found:', screenId);
+  }
+}
+window.showScreen = showScreen;
+
+let capacity = 4;
+
+function increaseCapacity() {
+  if (capacity < 6) {
+    capacity++;
+    const capacityElement = document.getElementById("capacity-value");
+    if (capacityElement) {
+      capacityElement.textContent = capacity;
+    }
+  }
+}
+
+function decreaseCapacity() {
+  if (capacity > 2) {
+    capacity--;
+    const capacityElement = document.getElementById("capacity-value");
+    if (capacityElement) {
+      capacityElement.textContent = capacity;
+    }
+  }
+}
+
+function toggleCheckbox(el) {
+  const box = el.querySelector('.checkbox-box');
+  if (box) {
+    box.classList.toggle('active');
+    const isChecked = box.classList.contains('active');
+    console.log("Private mode:", isChecked);
+  }
+}
+
+// Make functions globally available
+window.createRoom = createRoom;
+window.goJoinRooms = goJoinRooms;
+window.joinRoomFromInput = joinRoomFromInput;
+window.startGame = startGame;
+window.increaseCapacity = increaseCapacity;
+window.decreaseCapacity = decreaseCapacity;
+window.toggleCheckbox = toggleCheckbox;
+
+// Rest of your game code continues here...
 document.addEventListener('DOMContentLoaded', () => {
   // Add these new variables at the top of your DOMContentLoaded event listener
   let animatingUnits = new Map(); // key: "row,col", value: animation data
@@ -65,9 +241,14 @@ document.addEventListener('DOMContentLoaded', () => {
   const EASING_FACTOR = 0.15; // for smooth easing (lower = smoother, higher = faster)
 
   const canvas = document.getElementById('myCanvas');
-  const ctx = canvas.getContext('2d');
+  const ctx = canvas?.getContext('2d');
+  if (!ctx) {
+    console.error('Canvas context not found');
+    return;
+  }
+
   let reachableTiles = [];
-  let edgeTiles = []; // 4 adımının 3'ünü kendi topraçında atabileçeğin kenar seti
+  let edgeTiles = []; // 4 adımının 3'ünü kendi toprağında atabileceğin kenar seti
   let capturableTiles = []; // ele geçirilebilir düşman land'ları
   const tileSize = 40; // Hex yarıçapı
   const hexHeight = Math.sqrt(3) * tileSize;
@@ -218,10 +399,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Unit power levels
   window.unitPower = { peasant: 1, spearman: 2, swordsman: 3, knight: 4 };
-  // En üste yakın bir yerde:
-  const BUILDING_PROT = { tower: 2, strong_tower: 3 };
 
-  // Bu yardımcıyı ekleyin:
+  const BUILDING_PROT = { tower: 2, strong_tower: 3 };
+  
+  
+
   function getObjectAt(tile) {
     const line = window.landData.find(l => {
       const [r, c] = l.trim().split(/\s+/);
@@ -233,23 +415,26 @@ document.addEventListener('DOMContentLoaded', () => {
   }
   // NEW: Land protection system
   window.landProtection = new Map(); // key: "row,col", value: protection level
-  buildMenu.addEventListener('click', (e) => {
-    const btn = e.target.closest('button');
-    if (!btn || !selectedTile) return;
+  if (buildMenu) {
+    buildMenu.addEventListener('click', (e) => {
+      const btn = e.target.closest('button');
+      if (!btn || !selectedTile) return;
 
-    const obj = btn.dataset.object; // "castle" | "tower" | "strong_tower"
-    window.landData = window.landData.map(line => {
-      const parts = line.trim().split(/\s+/);
-      const [r, c, p] = parts;
-      if (+r === selectedTile.row && +c === selectedTile.col) {
-        return `${r} ${c} ${p} ${obj}`;
-      }
-      return line;
+      const obj = btn.dataset.object; // "castle" | "tower" | "strong_tower"
+      window.landData = window.landData.map(line => {
+        const parts = line.trim().split(/\s+/);
+        const [r, c, p] = parts;
+        if (+r === selectedTile.row && +c === selectedTile.col) {
+          return `${r} ${c} ${p} ${obj}`;
+        }
+        return line;
+      });
+
+      updateAllLandProtections(); // korumaları yenile
+      drawMap();
     });
+  }
 
-    updateAllLandProtections(); // korumaları yenile
-    drawMap();
-  });
   // NEW: Calculate protection level for a specific tile
   function calculateLandProtection(tile) {
     const landOwner = getLandOwner(tile);
@@ -505,7 +690,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     drawUnits(); // 🔥 birimler en son çiziliyor (üstte dursun)
   }
-  window.drawMap = drawMap;   
+  window.drawMap = drawMap;
   // Easing function for smooth animation
   function easeOutQuad(t) {
     return t * (2 - t);
@@ -1066,13 +1251,7 @@ function goJoinRooms() {
   showScreen('screen-join-room');
 }
 // "CREATE ROOM" tıklanınca
-function createRoom() {
-  setPlayerName();
-  const roomName = document.getElementById('roomname')?.value || 'ROOM';
-  const capacity = parseInt(document.getElementById('capacity-value')?.innerText || '4', 10);
-  const isPrivate = document.querySelector('.checkbox-box')?.classList.contains('active');
-  socket.emit('room:create', { roomName, capacity, isPrivate });
-}
+
 
 
 // Bekleme odasında START
@@ -1088,9 +1267,9 @@ function showScreen(screenId) {
 
   // Sadece istenen ekrana "active" sınıfı ekle
   document.getElementById(screenId).classList.add('active');
-}window.showScreen = showScreen;
+} window.showScreen = showScreen;
 
-let capacity = 4;
+
 
 function increaseCapacity() {
   if (capacity < 6) {

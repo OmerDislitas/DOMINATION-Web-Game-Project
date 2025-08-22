@@ -16,7 +16,7 @@
 
 <body>
     <div class="screen-container">
-        <div id="screen-login" class="screen  active">
+        <div id="screen-login" class="screen active">
             <!-- Giriş ekranı içeriği -->
             <div class="panel-outer">
 
@@ -226,10 +226,13 @@
 
 
                         <div class="larger-up-content">
-                            <button class="back-button" onclick="showScreen('screen-create-room')">
-                                <i class="bi bi-caret-left-fill"></i>
-                            </button>
-                            <h1 class="rooms-panel-header">WAITING ROOM</h1>
+                            <div class="up-left-content">
+                                <button class="back-button" onclick="showScreen('screen-create-room'); leaveRoom()">
+                                    <i class="bi bi-caret-left-fill"></i>
+                                </button>
+                                <span id="capacity">1/4</span>
+                            </div>
+                            <h1 class="waiting-room-header">ROOM: </h1>
                         </div>
                         <hr class="larger-up-line">
                         <div class="waiting-room-container">
@@ -273,14 +276,15 @@
                                 <span class="jersey-text">ROOM CODE: *CODE*</span>
                                 <div class="color-list-wrapper">
                                     <div class="color-list">
-                                        <div class="color-element red"></div>
-                                        <div class="color-element orange"></div>
-                                        <div class="color-element yellow"></div>
-                                        <div class="color-element green"></div>
-                                        <div class="color-element blue"></div>
-                                        <div class="color-element purple"></div>
-                                        <div class="color-element magenta"></div>
-                                        <div class="color-element pink"></div>
+                                        <div class="color-element red" data-color="red"></div>
+                                        <div class="color-element orange" data-color="orange"></div>
+                                        <div class="color-element yellow" data-color="yellow"></div>
+                                        <div class="color-element green" data-color="green"></div>
+
+                                        <div class="color-element cyan" data-color="cyan"></div>
+                                        <div class="color-element blue" data-color="blue"></div>
+                                        <div class="color-element purple" data-color="purple"></div>
+                                        <div class="color-element pink" data-color="pink"></div>
                                     </div>
                                 </div>
                             </div>
