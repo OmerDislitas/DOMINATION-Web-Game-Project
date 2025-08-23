@@ -26,6 +26,44 @@ const rooms = new Map();
 // en üste ekleyebilirsin
 const ROOM_COLORS = ['red', 'orange', 'yellow', 'green', 'cyan', 'blue', 'purple', 'pink'];
 
+
+
+const MAPS_DIR = path.join(__dirname, 'maps');
+
+// mapsByCapacity: { 2: [ [line,line,...], [line,...] ], 3: [...], ... }
+const mapsByCapacity = new Map();
+
+function parseMapFile(text) {
+  // boş satırları at
+  return text.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+}
+
+function loadAllMaps() {
+  mapsByCapacity.clear();
+  if (!fs.existsSync(MAPS_DIR)) {
+    console.warn('Maps dir not found:', MAPS_DIR);
+    return;
+  }
+  const files = fs.readdirSync(MAPS_DIR).filter(f => /\.txt$/i.test(f));
+
+  files.forEach(fname => {
+    // baştaki oyuncu sayısını yakala: "3p_*.txt"
+    const m = fname.match(/^(\d+)p_/i);
+    if (!m) return;
+    const cap = parseInt(m[1], 10);
+    const full = path.join(MAPS_DIR, fname);
+    const raw = fs.readFileSync(full, 'utf8');
+    const arr = parseMapFile(raw);
+    if (!mapsByCapacity.has(cap)) mapsByCapacity.set(cap, []);
+    mapsByCapacity.get(cap).push(arr);
+  });
+
+  console.log('Loaded maps:', [...mapsByCapacity.entries()].map(([k,v]) => `${k}p=${v.length}`).join(', '));
+}
+
+// sunucu açılırken yükle
+loadAllMaps();
+
 // publicRoom() içinde player'ların rengi de dönsün
 function publicRoom(room) {
   return {

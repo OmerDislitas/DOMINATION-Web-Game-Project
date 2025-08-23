@@ -22,6 +22,41 @@ function joinRoomFromInput() {
   setPlayerName();
   socket.emit('room:join', { code });
 }
+socket.on('game:start', () => {
+  const code = socket.data.roomCode;
+  if (!code) return;
+  const room = rooms.get(code);
+  if (!room) return;
+
+  if (!room.state.started) {
+    // Odadaki aktif oyuncu sayısı veya odanın capacity’si
+    const players = room.players.length || room.capacity;
+    const avail = mapsByCapacity.get(players);
+
+    if (!avail || avail.length === 0) {
+      // fallback: aynı sayı yoksa en yakın üst/alt sayıyı dene
+      const keys = [...mapsByCapacity.keys()].sort((a, b) => a - b);
+      let pickedList = null;
+      for (const k of keys) { if (k >= players) { pickedList = mapsByCapacity.get(k); break; } }
+      if (!pickedList) pickedList = mapsByCapacity.get(keys[keys.length - 1]); // en büyük olan
+
+      if (!pickedList) {
+        console.error('No maps found at all – cannot start');
+        socket.emit('error', 'No maps available on server');
+        return;
+      }
+      room.state.landData = pickedList[Math.floor(Math.random() * pickedList.length)];
+    } else {
+      // aynı sayıya uygun haritalardan rastgele birini seç
+      room.state.landData = avail[Math.floor(Math.random() * avail.length)];
+    }
+
+    room.state.started = true;
+    io.to(code).emit('game:init', { state: room.state });
+  } else {
+    socket.emit('game:init', { state: room.state });
+  }
+});
 
 // Oda/oyun mesajları
 socket.on('rooms:list', (rooms) => {
@@ -51,26 +86,26 @@ socket.on('room:created', ({ code, room }) => {
 
 // room:update render'ını genişlet
 socket.on('room:update', (room) => {
- 
+
   const panel = document.querySelector('.player-scroll-panel');
   if (panel) {
     panel.innerHTML = '';
     room.players.forEach(p => {
-  const div = document.createElement('div');
-  div.className = 'player-waiting';
-  div.innerHTML = `<i class="bi bi-person-fill"></i><span>${p.name}</span>`;
+      const div = document.createElement('div');
+      div.className = 'player-waiting';
+      div.innerHTML = `<i class="bi bi-person-fill"></i><span>${p.name}</span>`;
 
-  //  Renk bilgisini border’a uygula
-  if (p.color) {
-    div.style.boxShadow = `inset 0 0 0 4px ${p.color}`;
-  }
+      //  Renk bilgisini border’a uygula
+      if (p.color) {
+        div.style.boxShadow = `inset 0 0 0 4px ${p.color}`;
+      }
 
-  panel.appendChild(div);
-  const header = document.querySelector('.waiting-room-header');
-  if (header) {
-    header.textContent = `ROOM: ${room.name} (${room.isPrivate ? "PRIVATE" : "NON-PRIVATE"})`;
-  }
-});
+      panel.appendChild(div);
+      const header = document.querySelector('.waiting-room-header');
+      if (header) {
+        header.textContent = `ROOM: ${room.name} (${room.isPrivate ? "PRIVATE" : "NON-PRIVATE"})`;
+      }
+    });
   }
 
   // kapasite
@@ -126,15 +161,15 @@ socket.on('game:update', (patch) => {
   if (window.drawMap) window.drawMap();
 });
 function wireColorPickers() {
-    document.querySelectorAll('.color-element').forEach(el => {
-      el.addEventListener('click', () => {
-        const color = el.dataset.color;
-        // rezerve edilmişse tıklama işleme
-        if (el.classList.contains('taken') && !el.classList.contains('selected')) return;
-        socket.emit('room:pickColor', { color });
-      });
+  document.querySelectorAll('.color-element').forEach(el => {
+    el.addEventListener('click', () => {
+      const color = el.dataset.color;
+      // rezerve edilmişse tıklama işleme
+      if (el.classList.contains('taken') && !el.classList.contains('selected')) return;
+      socket.emit('room:pickColor', { color });
     });
-  }
+  });
+}
 // Login ekranında oyuncu adını gönder
 function setPlayerName() {
   const name = document.getElementById('username')?.value || 'Player';
@@ -164,9 +199,7 @@ function leaveRoom() {
 
 // Bekleme odasında START
 function startGame() {
-  console.log('Starting game...');
-  // İlk elde server'a haritayı bir kez yolla (server boşsa set ediyor)
-  socket.emit('game:start', { landData: window.landData });
+  socket.emit('game:start');   // haritayı server seçecek
   showScreen('screen-game');
 }
 
@@ -311,79 +344,11 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   // Örnek #land verisi
-  window.landData = `
-5 3 1
-6 3 1
-7 3 1 tower
-8 3 1 
-9 3 1
-
-4 4 3
-5 4 3 tower
-6 4 1
-7 4 1
-8 4 1
-9 4 1
-10 4 0
-
-3 5 3
-4 5 3
-5 5 3
-6 5 3
-7 5 1
-8 5 1
-9 5 0
-10 5 0
-
-2 6 3
-3 6 3
-4 6 3
-5 6 3
-6 6 3
-7 6 2
-8 6 0
-9 6 0
-10 6 0
-11 6 0
-
-2 7 3
-3 7 3
-4 7 3
-5 7 3
-6 7 2
-7 7 2
-8 7 0
-9 7 0
-10 7 0
-
-3 8 3
-4 8 3
-5 8 2 tower
-6 8 2 
-7 8 2
-8 8 2
-9 8 0
-10 8 0
-
-4 9 2
-5 9 2
-6 9 2
-7 9 2
-8 9 2
-9 9 2
-
-5 10 2
-6 10 2 tower
-7 10 2
-8 10 2 
-
-`.trim().split('\n');
-
+  
   // Move unitData outside or make it global
   window.unitData = `
-4 4 3 peasant
-4 5 3 spearman
-`.trim().split('\n');
+
+`.trim().split('\n').filter(Boolean);
 
   window.hexDirections = [
     { q: 1, r: 0 },
@@ -395,14 +360,37 @@ document.addEventListener('DOMContentLoaded', () => {
   ];
 
   // Oyuncu renkleri
-  const colors = ['#4CAF50', '#14BBC7', '#EE6B19', '#BC1EA7'];
+  const colors = ['#2d2d2d', '#4CAF50', '#14BBC7', '#EE6B19', '#BC1EA7'];
 
   // Unit power levels
   window.unitPower = { peasant: 1, spearman: 2, swordsman: 3, knight: 4 };
 
   const BUILDING_PROT = { tower: 2, strong_tower: 3 };
-  
-  
+
+
+  function centerCameraOnMap() {
+    if (!Array.isArray(window.landData) || window.landData.length === 0) return;
+
+    let minX = Infinity, maxX = -Infinity;
+    let minY = Infinity, maxY = -Infinity;
+
+    window.landData.forEach(line => {
+      const [row, col] = line.trim().split(/\s+/).map(Number);
+      if (Number.isNaN(row) || Number.isNaN(col)) return;
+      const { x, y } = hexToPixel(row, col); // dünya koordinatı (ölçek uygulanmamış)
+      if (x < minX) minX = x; if (x > maxX) maxX = x;
+      if (y < minY) minY = y; if (y > maxY) maxY = y;
+    });
+
+    // haritanın merkezi (dünya koordinatı)
+    const midX = (minX + maxX) / 2;
+    const midY = (minY + maxY) / 2;
+
+    // ekran merkezine getirmek için offset’i ayarla
+    offsetX = canvas.width / 2 - midX * scale;
+    offsetY = canvas.height / 2 - midY * scale;
+  }
+  window.centerCameraOnMap = centerCameraOnMap; // dışarıdan da çağrılabilsin
 
   function getObjectAt(tile) {
     const line = window.landData.find(l => {
@@ -417,8 +405,16 @@ document.addEventListener('DOMContentLoaded', () => {
   window.landProtection = new Map(); // key: "row,col", value: protection level
   if (buildMenu) {
     buildMenu.addEventListener('click', (e) => {
+
       const btn = e.target.closest('button');
       if (!btn || !selectedTile) return;
+      const ownerId = getLandOwner(selectedTile);
+      if (ownerId === null || ownerId === 0) {
+        // Sahipsiz hex'e bina kurma: menüleri kapat, alert verme
+        unitMenu.classList.add('hidden');
+        buildMenu.classList.add('hidden');
+        return;
+      }
 
       const obj = btn.dataset.object; // "castle" | "tower" | "strong_tower"
       window.landData = window.landData.map(line => {
@@ -471,6 +467,69 @@ document.addEventListener('DOMContentLoaded', () => {
 
     return maxProtection;
   }
+
+  //!DEBUG ISLEMI ICIN
+  // DEBUG bayrağı
+  window.DEBUG_PROT = true;
+  // Tek bir tile için ayrıntılı koruma dökümü
+  window.debugProtectionFor = function debugProtectionFor(tile) {
+    const owner = getLandOwner(tile);
+    const selfObj = getObjectAt(tile);
+    const selfVal = (BUILDING_PROT[selfObj] || 0);
+    const neighbors = getNeighbors(tile);
+
+    console.groupCollapsed(
+      `[PROT] Tile (${tile.row},${tile.col}) owner=${owner} ` +
+      `selfObj=${selfObj || '-'} selfVal=${selfVal}`
+    );
+
+    const rows = [];
+    let maxProt = selfVal;
+
+    // Kendi katkısı
+    rows.push({
+      source: 'SELF',
+      row: tile.row, col: tile.col,
+      owner,
+      obj: selfObj || '-',
+      objVal: selfVal || 0,
+      unit: '-',
+      unitPow: 0,
+      contributes: selfVal > 0 ? 'YES' : 'no (0)'
+    });
+
+    // Komşular
+    neighbors.forEach(nb => {
+      const nbOwner = getLandOwner(nb);
+      const sameSide = (nbOwner === owner);
+
+      const nbObj = getObjectAt(nb);
+      const nbObjVal = BUILDING_PROT[nbObj] || 0;
+
+      const unit = getUnitAt(nb);
+      const unitPow = unit ? (window.unitPower[unit.type] || 0) : 0;
+
+      const best = sameSide ? Math.max(nbObjVal, unitPow) : 0;
+      if (best > maxProt) maxProt = best > maxProt ? best : maxProt;
+
+      rows.push({
+        source: 'NEIGHBOR',
+        row: nb.row, col: nb.col,
+        owner: nbOwner,
+        obj: nbObj || '-',
+        objVal: nbObjVal,
+        unit: unit ? unit.type : '-',
+        unitPow,
+        contributes: sameSide ? (best > 0 ? `YES (${best})` : 'sameSide but 0') : 'no (enemy/neutral)'
+      });
+    });
+
+    console.table(rows);
+    console.log(`[PROT] RESULT for (${tile.row},${tile.col}) = ${maxProt}`);
+    console.groupEnd();
+  };
+  //!DEBUG ISLEMI ICIN FONKS. BITIS!!!!! 
+
 
   // NEW: Update all land protections dynamically
   function updateAllLandProtections() {
@@ -531,8 +590,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Satır/sütun -> pixel koordinatı (flat-top hex)
   function hexToPixel(row, col) {
+    const parity = col & 1;               // 0: even, 1: odd  (negatiflerde de doğru)
     const x = tileSize * 1.5 * col;
-    const y = hexHeight * (row + 0.5 * (col % 2));
+    const y = hexHeight * (row + 0.5 * parity);
     return { x, y };
   }
 
@@ -611,7 +671,9 @@ document.addEventListener('DOMContentLoaded', () => {
           }
 
           const effectiveDefense = Math.max(defenderPower, landProtection);
-          canCaptureByPower = attackerPower > effectiveDefense;
+          canCaptureByPower =
+            attackerPower > effectiveDefense ||
+            (attackerType === 'knight' && effectiveDefense === 4);
         }
 
         if (isCapturable && canCaptureByPower) {
@@ -639,7 +701,8 @@ document.addEventListener('DOMContentLoaded', () => {
             edgeTiles.some(t => t.row === nb.row && t.col === nb.col)
           );
 
-          if (enemyReachable && attackerPower > enemyPower) {
+          if (enemyReachable && (attackerPower > enemyPower ||
+            (attackerType === 'knight' && enemyType === 'knight'))) {
             ctx.beginPath();
             ctx.strokeStyle = 'orange';
             ctx.lineWidth = 4;
@@ -898,8 +961,10 @@ document.addEventListener('DOMContentLoaded', () => {
     // Örnek: seçili tile'a oyuncu 1'e ait birim yerleştir
     // Birim, bulunduğu land'in sahibiyle aynı ID'yi almalı
     const ownerId = getLandOwner(selectedTile);
-    if (ownerId === null) {
-      alert("Sahibi olmayan bir hex'e birim yerleştirilemez.");
+    // Sahipsiz (0 veya null) => menüleri sessizce kapat, işlem yapma
+    if (ownerId === null || ownerId === 0) {
+      unitMenu.classList.add('hidden');
+      buildMenu.classList.add('hidden');
       return;
     }
 
@@ -933,6 +998,10 @@ document.addEventListener('DOMContentLoaded', () => {
       drawMap();
       return;
     }
+    //!DEBUG ISLEMI ICIN
+    if (window.DEBUG_PROT) {
+      window.debugProtectionFor(clickedTile);
+    }//!000000000000000000
 
     // Tıklanan tile'da birim var mı?
     const unitOnTile = window.unitData.find(line => {
@@ -981,7 +1050,12 @@ document.addEventListener('DOMContentLoaded', () => {
           const attackerPower = window.unitPower[attackerType] || 0;
           const landProtection = getLandProtection(clickedTile);
 
-          if (attackerPower <= landProtection) {
+          // Özel kural: knight(4) => protection(4) land'ı alabilir
+          const canCaptureProt =
+            attackerPower > landProtection ||
+            (attackerType === 'knight' && landProtection === 4);
+
+          if (!canCaptureProt) {
             console.log(`Attack blocked: ${attackerType} (power ${attackerPower}) cannot capture land with protection ${landProtection}`);
             return;
           }
@@ -1028,13 +1102,27 @@ document.addEventListener('DOMContentLoaded', () => {
 
           if (!canReach) return;
 
-          // Power check
+          // Power check (özel kural: knight vs knight serbest, saldıran kazanır)
           const attackerType = getUnitTypeAt(selectedUnit);
           const defenderType = getUnitTypeAt(clickedTile);
           const attackerPower = window.unitPower[attackerType] || 0;
           const defenderPower = window.unitPower[defenderType] || 0;
 
-          if (attackerPower <= defenderPower) {
+          let canAttack = false;
+
+          // Eğer ikisi de knight ise: izin ver
+          if (attackerType === 'knight' && defenderType === 'knight') {
+            canAttack = true;
+          } else {
+            canAttack = attackerPower > defenderPower;
+          }
+
+          // Özel kural: knight vs knight serbest (eşitte saldıran kazanır)
+          canAttack =
+            attackerPower > defenderPower ||
+            (attackerType === 'knight' && defenderType === 'knight');
+
+          if (!canAttack) {
             console.log(`${attackerType} (power ${attackerPower}) cannot attack ${defenderType} (power ${defenderPower})`);
             return;
           }
@@ -1131,19 +1219,27 @@ document.addEventListener('DOMContentLoaded', () => {
       // Birim seç
       selectedUnit = { row: clickedTile.row, col: clickedTile.col };
       selectedTile = clickedTile;
+
       const owner = getUnitOwner(clickedTile);
       reachableTiles = getReachableTiles(clickedTile, 4, owner);
       edgeTiles = getReachableTiles(clickedTile, 3, owner); // Add this line
       buildMenu.classList.add('hidden');
       unitMenu.classList.add('hidden');
     } else {
-      // Boş tile → menü aç
+      // Boş tile
       selectedTile = clickedTile;
       selectedUnit = null;
       reachableTiles = [];
       edgeTiles = [];
-      unitMenu.classList.remove('hidden');
-      buildMenu.classList.remove('hidden');
+      const owner = getLandOwner(clickedTile);
+      // Sadece sahibi 0/NULL DEĞİLSE menüleri aç
+      if (owner !== null && owner !== 0) {
+        unitMenu.classList.remove('hidden');
+        buildMenu.classList.remove('hidden');
+      } else {
+        unitMenu.classList.add('hidden');
+        buildMenu.classList.add('hidden');
+      }
     }
     initializecastleDistribution();
     drawMap();
@@ -1151,7 +1247,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Ekran yüklendiğinde çiz
   window.addEventListener('DOMContentLoaded', () => {
-
+    centerCameraOnMap();
     drawMap();
 
   });
@@ -1431,40 +1527,22 @@ window.protectedMap = {}; // "r,c" -> 0..4
 
 function recomputeProtection() {
   const map = {};
-
-  // Initialize all lands with 0 protection
   window.landData.forEach(line => {
-    const parts = line.trim().split(/\s+/);
-    const r = +parts[0], c = +parts[1];
+    const [r, c] = line.trim().split(/\s+/).map(Number);
     map[`${r},${c}`] = 0;
   });
 
-  // Each unit protects neighboring lands of the same player
-  window.unitData.forEach(line => {
+  (window.unitData || []).forEach(line => {
+    if (!line || !line.trim()) return;                    // boş satırı at
     const parts = line.trim().split(/\s+/);
-    const ur = +parts[0], uc = +parts[1];
-    const up = parseInt(parts[2]);    // unit player
-    const ut = parts[3];              // type: peasant|spearman|...
+    if (parts.length < 4) return;                          // eksik formatı at (r c p type)
+    const ut = parts[3];
     const power = Number(window.unitPower?.[ut] ?? 0);
+    if (window.unitPower?.[ut] === undefined) return;      // tanımsız tipi at
 
-
-
-    // Handle unknown unit types
-    if (!power && window.unitPower?.[ut] === undefined) {
-      console.warn('Unknown unit type:', ut, 'in line:', line);
-    }
-
-    // Check all neighbors of this unit
-    const neighbors = getNeighbors({ row: ur, col: uc });
-    neighbors.forEach(nb => {
-      const neighborOwner = getLandOwner(nb);
-
-    });
   });
 
   window.protectedMap = map;
-
-
 }
 
 
@@ -1595,8 +1673,9 @@ function removeInvalidcastles() {
     const parts = line.trim().split(/\s+/);
     const [r, c, p, obj] = parts;
     const key = `${r},${c}`;
-
-    if (obj === 'castle' && !allValidTiles.has(key)) {
+    // 1) Geçersiz bölgelerdeki castle'ı sil
+    // 2) Sahip 0 ise castle asla olamaz → sil
+    if (obj === 'castle' && (!allValidTiles.has(key) || +p === 0)) {
       // This castle is on an invalid tile, remove it
       return `${r} ${c} ${p}`;
     }
@@ -1607,13 +1686,15 @@ function removeInvalidcastles() {
 // Main function to distribute castles after each move
 function distributecastles() {
 
-  // First, remove any castles from invalid regions
+  // 0'a castle asla olmayacak → önce temizle
   removeInvalidcastles();
 
   // Find all connected regions
   const regions = findConnectedRegions();
 
   regions.forEach((playerRegions, playerId) => {
+    // 0 (nötr) bölgeleri komple atla
+    if (playerId === 0) return;
     console.log(`Player ${playerId} has ${playerRegions.length} regions`);
 
     playerRegions.forEach((region, index) => {
