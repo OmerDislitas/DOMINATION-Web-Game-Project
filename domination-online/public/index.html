@@ -9,7 +9,7 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.min.css">
     <script src="/socket.io/socket.io.js"></script>
     <link rel="stylesheet" href="/assets/styles.css">
-    <script src="assets/main.js"></script>
+    <script type="module" src="assets/main.js"></script>
     <title>DOMINATION</title>
 
 </head>
@@ -17,15 +17,13 @@
 <body>
     <div class="screen-container">
         <div id="screen-login" class="screen active">
-            <!-- Giriş ekranı içeriği -->
             <div class="panel-outer">
-
                 <div class="panel-inner">
                     <h1 class="panel-header">DOMINATION</h1>
                     <div class="panel-container">
                         <div class="input-group">
                             <span class="classic-text">NAME:</span>
-                            <input class="name-input" type="text" id="username" placeholder="Enter...">
+                            <input class="name-input" type="text" id="username" placeholder="Enter..." maxlength="12" autocomplete="off">
                         </div>
                     </div>
                     <div class="login-button-group">
@@ -34,156 +32,44 @@
                             CREATE ROOM
                         </button>
                     </div>
-
                 </div>
-
-
             </div>
         </div>
 
         <div id="screen-join-room" class="screen">
-            <!-- Room listesi ekranı -->
             <div class="panel-outer">
-
                 <div class="rooms-panel-inner">
                     <div class="up-content">
                         <button class="back-button" onclick="showScreen('screen-login')">
                             <i class="bi bi-caret-left-fill"></i>
                         </button>
-
                         <h1 class="rooms-panel-header">ROOMS</h1>
                         <input class="room-code-input" type="text" id="joincode" placeholder="Room Code">
                         <button class="go-button" onclick="joinRoomFromInput()">GO</button>
                     </div>
-
                     <hr class="up-line">
                     <div class="rooms-content">
-
                         <div class="join-button-group">
-                            <div class="room-scroll-panel">
-
-                                <button class="room-entry-item" onclick="showScreen('screen-join-room')">
-                                    <span>*ROOM TITLE*</span>
-                                    <div>
-                                        <i class="bi bi-person-fill"></i>
-                                        <span>5/6</span>
-                                    </div>
-                                </button>
-
-                                <button class="room-entry-item" onclick="showScreen('screen-join-room')">
-                                    <span>*ROOM TITLE*</span>
-                                    <div>
-                                        <i class="bi bi-person-fill"></i>
-                                        <span>3/6</span>
-                                    </div>
-
-                                </button>
-
-                                <button class="room-entry-item" onclick="showScreen('screen-join-room')">
-                                    <span>*ROOM TITLE*</span>
-                                    <div>
-                                        <i class="bi bi-person-fill"></i>
-                                        <span>3/5</span>
-                                    </div>
-                                </button>
-
-                                <button class="room-entry-item" onclick="showScreen('screen-join-room')">
-                                    <span>*ROOM TITLE*</span>
-                                    <div>
-                                        <i class="bi bi-person-fill"></i>
-                                        <span>1/2</span>
-                                    </div>
-                                </button>
-
-                                <button class="room-entry-item" onclick="showScreen('screen-join-room')">
-                                    <span>*ROOM TITLE*</span>
-                                    <div>
-                                        <i class="bi bi-person-fill"></i>
-                                        <span>2/3</span>
-                                    </div>
-                                </button>
-
-                                <button class="room-entry-item" onclick="showScreen('screen-join-room')">
-                                    <span>*ROOM TITLE*</span>
-                                    <div>
-                                        <i class="bi bi-person-fill"></i>
-                                        <span>1/2</span>
-                                    </div>
-                                </button>
-
-                                <button class="room-entry-item" onclick="showScreen('screen-join-room')">
-                                    <span>*ROOM TITLE*</span>
-                                    <div>
-                                        <i class="bi bi-person-fill"></i>
-                                        <span>1/2</span>
-                                    </div>
-                                </button>
-
-                                <button class="room-entry-item" onclick="showScreen('screen-join-room')">
-                                    <span>*ROOM TITLE*</span>
-                                    <div>
-                                        <i class="bi bi-person-fill"></i>
-                                        <span>2/4</span>
-                                    </div>
-                                </button>
-
-                                <button class="room-entry-item" onclick="showScreen('screen-join-room')">
-                                    <span>*ROOM TITLE*</span>
-                                    <div>
-                                        <i class="bi bi-person-fill"></i>
-                                        <span>1/4</span>
-                                    </div>
-                                </button>
-
-                                <button class="room-entry-item" onclick="showScreen('screen-join-room')">
-                                    <span>*ROOM TITLE*</span>
-                                    <div>
-                                        <i class="bi bi-person-fill"></i>
-                                        <span>1/2</span>
-                                    </div>
-                                </button>
-
-                                <button class="room-entry-item" onclick="showScreen('screen-join-room')">
-                                    <span>*ROOM TITLE*</span>
-                                    <div>
-                                        <i class="bi bi-person-fill"></i>
-                                        <span>2/6</span>
-                                    </div>
-                                </button>
-
-                                <button class="room-entry-item" onclick="showScreen('screen-join-room')">
-                                    <span>*ROOM TITLE*</span>
-                                    <div>
-                                        <i class="bi bi-person-fill"></i>
-                                        <span>3/6</span>
-                                    </div>
-                                </button>
+                            <div class="room-scroll-panel" id="room-list">
+                                <!-- Rooms will be dynamically populated here -->
                             </div>
                         </div>
                     </div>
-
                 </div>
-
-
             </div>
         </div>
 
         <div id="screen-create-room" class="screen">
-            <!-- Room oluşturma ekranı -->
             <div class="panel-outer">
-
                 <div class="rooms-panel-inner">
                     <div class="up-content">
                         <button class="back-button" onclick="showScreen('screen-login')">
                             <i class="bi bi-caret-left-fill"></i>
                         </button>
-
                         <h1 class="rooms-panel-header">CREATE ROOM</h1>
                     </div>
-
                     <hr class="up-line">
                     <div class="create-room-content">
-
                         <div class="panel-container">
                             <div class="room-name-group">
                                 <span class="classic-text">ROOM NAME</span>
@@ -205,26 +91,19 @@
                             </div>
                         </div>
                         <div class="login-button-group">
-
                             <button class="login-button" onclick="createRoom()">
                                 CREATE ROOM
                             </button>
                         </div>
                     </div>
-
                 </div>
-
-
             </div>
         </div>
 
         <div id="screen-waiting-room" class="screen">
-            <!-- Room oluşturma ekranı -->
             <div class="larger-panel-outer">
                 <div class="larger-panel-inner">
                     <div class="waiting-room-panel-up-container">
-
-
                         <div class="larger-up-content">
                             <div class="up-left-content">
                                 <button class="back-button" onclick="showScreen('screen-create-room'); leaveRoom()">
@@ -237,40 +116,9 @@
                         <hr class="larger-up-line">
                         <div class="waiting-room-container">
                             <div class="player-list-container">
-                                <div class="player-scroll-panel">
-
-                                    <div class="player-waiting">
-                                        <i class="bi bi-person-fill"></i>
-                                        <span>PLAYER-1</span>
-                                    </div>
-
-                                    <div class="player-waiting">
-                                        <i class="bi bi-person-fill"></i>
-                                        <span>PLAYER-2</span>
-                                    </div>
-
-                                    <div class="player-waiting">
-                                        <i class="bi bi-person-fill"></i>
-                                        <span>PLAYER-3</span>
-                                    </div>
-
-                                    <div class="player-waiting">
-                                        <i class="bi bi-person-fill"></i>
-                                        <span>PLAYER-4</span>
-                                    </div>
-
-                                    <div class="player-waiting">
-                                        <i class="bi bi-person-fill"></i>
-                                        <span>PLAYER-5</span>
-                                    </div>
-
-                                    <div class="player-waiting">
-                                        <i class="bi bi-person-fill"></i>
-                                        <span>PLAYER-6</span>
-                                    </div>
-
+                                <div class="player-scroll-panel" id="player-list">
+                                    <!-- Players will be dynamically populated here -->
                                 </div>
-
                             </div>
                             <div class="waiting-room-right">
                                 <span class="jersey-text">ROOM CODE: *CODE*</span>
@@ -280,7 +128,6 @@
                                         <div class="color-element orange" data-color="orange"></div>
                                         <div class="color-element yellow" data-color="yellow"></div>
                                         <div class="color-element green" data-color="green"></div>
-
                                         <div class="color-element cyan" data-color="cyan"></div>
                                         <div class="color-element blue" data-color="blue"></div>
                                         <div class="color-element purple" data-color="purple"></div>
@@ -288,17 +135,12 @@
                                     </div>
                                 </div>
                             </div>
-
-
                         </div>
                     </div>
                     <div class="waiting-room-panel-down-container">
                         <span class="jersey-text">PLAYER WAITING...</span>
-
                         <button class="start-button" onclick="startGame(); showScreen('screen-game')">START</button>
                     </div>
-
-
                 </div>
             </div>
         </div>
@@ -308,12 +150,24 @@
                 <i class="bi bi-caret-left-fill"></i>
             </button>
             <span CLASS="in-game-header">DOMINATION</span>
-            <canvas id="myCanvas" width="800" height="550"></canvas>
+            <canvas id="myCanvas" width="800" height="550" class="game-canvas"></canvas>
+
+            <div class="game-hud">
+                <div id="coin-display" class="hud-element top-left hidden">
+                    <span class="coin-icon">$</span>
+                    <span id="coin-amount" class="coin-amount">10</span>
+                </div>
+                <div id="income-display" class="hud-element top-right hidden">
+                    <span class="income-icon">+</span>
+                    <span id="income-amount" class="income-amount">3</span>
+                </div>
+            </div>
+
             <div class="object-navigator">
                 <div id="build-menu" class="hidden">
                     <button data-object="h"><img src="assets/img/house.png" alt=""></button>
-                    <button data-object="t"><img src="assets/img/tower.png" alt=""></button>
-                    <button data-object="st"><img src="assets/img/strong_tower.png" alt=""></button>
+                    <button data-object="tower"><img src="assets/img/tower.png" alt=""></button>
+                    <button data-object="strong_tower"><img src="assets/img/strong_tower.png" alt=""></button>
                 </div>
 
                 <div id="unit-menu" class="hidden">

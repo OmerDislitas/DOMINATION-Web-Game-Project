@@ -64,6 +64,45 @@ function loadAllMaps() {
 // sunucu açılırken yükle
 loadAllMaps();
 
+// Function to select appropriate map based on player count
+function selectMapForPlayerCount(playerCount) {
+  console.log(`[MAP SELECTION] Selecting map for ${playerCount} players`);
+  
+  // First try to find maps for exact player count
+  if (mapsByCapacity.has(playerCount) && mapsByCapacity.get(playerCount).length > 0) {
+    const mapsForCount = mapsByCapacity.get(playerCount);
+    const randomIndex = Math.floor(Math.random() * mapsForCount.length);
+    const selectedMap = mapsForCount[randomIndex];
+    console.log(`[MAP SELECTION] Found ${mapsForCount.length} maps for ${playerCount}p, selected map ${randomIndex + 1}`);
+    return selectedMap;
+  }
+  
+  // If no exact match, try to find a map with higher capacity
+  const availableCapacities = Array.from(mapsByCapacity.keys()).sort((a, b) => a - b);
+  console.log(`[MAP SELECTION] Available capacities: ${availableCapacities.join(', ')}`);
+  
+  for (const capacity of availableCapacities) {
+    if (capacity >= playerCount && mapsByCapacity.get(capacity).length > 0) {
+      const mapsForCount = mapsByCapacity.get(capacity);
+      const randomIndex = Math.floor(Math.random() * mapsForCount.length);
+      const selectedMap = mapsForCount[randomIndex];
+      console.log(`[MAP SELECTION] Fallback: Using ${capacity}p map for ${playerCount} players, selected map ${randomIndex + 1}`);
+      return selectedMap;
+    }
+  }
+  
+  // If still no map found, use default map (first available)
+  const firstAvailable = availableCapacities[0];
+  if (firstAvailable && mapsByCapacity.get(firstAvailable).length > 0) {
+    const defaultMap = mapsByCapacity.get(firstAvailable)[0];
+    console.log(`[MAP SELECTION] Emergency fallback: Using ${firstAvailable}p map for ${playerCount} players`);
+    return defaultMap;
+  }
+  
+  console.warn(`[MAP SELECTION] No maps available! Using empty land data.`);
+  return [];
+}
+
 // publicRoom() içinde player'ların rengi de dönsün
 function publicRoom(room) {
   return {
@@ -133,7 +172,7 @@ io.on('connection', (socket) => {
 });
 
 function createInitialState() {
-  return { landData: [], started: false };
+  return { landData: [], unitData: [], started: false };
 }
 
 
@@ -143,25 +182,221 @@ function setLandOwner(state, tile, newOwner) {
     const parts = ('' + line).trim().split(/\s+/);
     const [r, c, oldOwner, ...rest] = parts;
     if (+r === tile.row && +c === tile.col) {
-      const filtered = rest.filter(tok => tok !== 'castle' && tok !== 'house');
+      // Preserve ALL building types during land ownership changes
+      // Only change the owner, keep all buildings and objects intact
+      return `${r} ${c} ${newOwner} ${rest.join(' ')}`.trim();
+    }
+    return line;
+  });
+  
+  // Trigger castle redistribution after ownership change
+  console.log(`[CASTLE] Triggering castle redistribution after ownership change at (${tile.row}, ${tile.col})`);
+  distributeCastles(state);
+}
+
+// Capture land with structure destruction for soldier-initiated captures
+// Destroys military structures (tower, strong_tower, castle) on captured tiles
+function captureLandWithStructureDestruction(state, tile, newOwner) {
+  state.landData = state.landData.map(line => {
+    const parts = ('' + line).trim().split(/\s+/);
+    const [r, c, oldOwner, ...rest] = parts;
+    if (+r === tile.row && +c === tile.col) {
+      // Filter out all military structures during soldier capture
+      const filtered = rest.filter(tok => 
+        tok !== 'castle' && 
+        tok !== 'tower' && 
+        tok !== 'strong_tower' &&
+        tok !== 'house'  // Keep house removal for consistency
+      );
       return `${r} ${c} ${newOwner} ${filtered.join(' ')}`.trim();
     }
     return line;
   });
 }
 
+// Server-side castle distribution functions
+function getNeighbors(tile) {
+  // Hex direction vectors for cube coordinates
+  const cubeDirs = [
+    { x: 1, y: -1, z: 0 }, { x: 1, y: 0, z: -1 }, { x: 0, y: 1, z: -1 },
+    { x: -1, y: 1, z: 0 }, { x: -1, y: 0, z: 1 }, { x: 0, y: -1, z: 1 }
+  ];
+  
+  // Convert offset to cube coordinates
+  const x = tile.col;
+  const z = tile.row - ((tile.col - (tile.col & 1)) / 2);
+  const y = -x - z;
+  
+  // Get neighbors and convert back to offset
+  return cubeDirs.map(d => {
+    const nx = x + d.x;
+    const ny = y + d.y;
+    const nz = z + d.z;
+    const row = nz + ((nx - (nx & 1)) / 2);
+    const col = nx;
+    return { row, col };
+  });
+}
 
+function getLandOwner(tile, landData) {
+  const line = landData.find(l => {
+    const [r, c] = ('' + l).trim().split(/\s+/);
+    return parseInt(r) === tile.row && parseInt(c) === tile.col;
+  });
+  if (!line) return null;
+  const [, , p] = ('' + line).trim().split(/\s+/);
+  return parseInt(p);
+}
+
+function findConnectedRegions(state) {
+  const visited = new Set();
+  const regions = new Map();
+
+  state.landData.forEach(line => {
+    const [row, col, player] = ('' + line).trim().split(/\s+/);
+    const r = parseInt(row);
+    const c = parseInt(col);
+    const p = parseInt(player);
+    const key = `${r},${c}`;
+
+    if (visited.has(key)) return;
+
+    const region = findConnectedTilesOfSamePlayer({ row: r, col: c }, p, visited, state.landData);
+
+    if (region.length >= 2) {
+      if (!regions.has(p)) {
+        regions.set(p, []);
+      }
+      regions.get(p).push(region);
+    }
+  });
+
+  return regions;
+}
+
+function findConnectedTilesOfSamePlayer(startTile, targetPlayer, visited, landData) {
+  const region = [];
+  const queue = [startTile];
+  const regionVisited = new Set();
+
+  while (queue.length > 0) {
+    const current = queue.shift();
+    const key = `${current.row},${current.col}`;
+
+    if (regionVisited.has(key)) continue;
+    regionVisited.add(key);
+    visited.add(key);
+
+    const owner = getLandOwner(current, landData);
+    if (owner !== targetPlayer) continue;
+
+    region.push(current);
+
+    const neighbors = getNeighbors(current);
+    neighbors.forEach(neighbor => {
+      const neighborKey = `${neighbor.row},${neighbor.col}`;
+      if (!regionVisited.has(neighborKey)) {
+        const neighborOwner = getLandOwner(neighbor, landData);
+        if (neighborOwner === targetPlayer) {
+          queue.push(neighbor);
+        }
+      }
+    });
+  }
+
+  return region;
+}
+
+function regionHasCastle(region, landData) {
+  return region.some(tile => {
+    const line = landData.find(l => {
+      const [r, c] = ('' + l).trim().split(/\s+/);
+      return parseInt(r) === tile.row && parseInt(c) === tile.col;
+    });
+    if (!line) return false;
+    const parts = ('' + line).trim().split(/\s+/);
+    return parts[3] === 'castle';
+  });
+}
+
+function assignCastleToRegion(region, state) {
+  const availableTiles = region.filter(tile => {
+    const line = state.landData.find(l => {
+      const [r, c] = ('' + l).trim().split(/\s+/);
+      return parseInt(r) === tile.row && parseInt(c) === tile.col;
+    });
+    if (!line) return false;
+    const parts = ('' + line).trim().split(/\s+/);
+    return parts.length <= 3;
+  });
+
+  if (availableTiles.length === 0) return false;
+
+  const randomIndex = Math.floor(Math.random() * availableTiles.length);
+  const selectedTile = availableTiles[randomIndex];
+
+  // Add castle to the selected tile
+  state.landData = state.landData.map(line => {
+    const parts = ('' + line).trim().split(/\s+/);
+    const [r, c, p] = parts;
+    if (+r === selectedTile.row && +c === selectedTile.col) {
+      return `${r} ${c} ${p} castle`;
+    }
+    return line;
+  });
+  
+  return true;
+}
+
+function removeInvalidCastles(state) {
+  const validRegions = findConnectedRegions(state);
+  const allValidTiles = new Set();
+
+  validRegions.forEach(playerRegions => {
+    playerRegions.forEach(region => {
+      region.forEach(tile => {
+        allValidTiles.add(`${tile.row},${tile.col}`);
+      });
+    });
+  });
+
+  state.landData = state.landData.map(line => {
+    const parts = ('' + line).trim().split(/\s+/);
+    const [r, c, p, obj] = parts;
+    const key = `${r},${c}`;
+    
+    if (obj === 'castle' && (!allValidTiles.has(key) || +p === 0)) {
+      return `${r} ${c} ${p}`;
+    }
+    return line;
+  });
+}
+
+function distributeCastles(state) {
+  removeInvalidCastles(state);
+  const regions = findConnectedRegions(state);
+
+  regions.forEach((playerRegions, playerId) => {
+    if (playerId === 0) return; // Skip neutral player
+
+    playerRegions.forEach((region, index) => {
+      if (!regionHasCastle(region, state.landData)) {
+        assignCastleToRegion(region, state);
+      }
+    });
+  });
+}
+
+function initializeCastleDistribution(state) {
+  distributeCastles(state);
+}
 
 io.on('connection', (socket) => {
   console.log('client connected', socket.id);
 
-  // TÜM gelen eventleri logla: debug kolay olsun
-  socket.onAny((ev, ...args) => console.log('[in]', ev, args));
-
   // oyuncu adı
   socket.on('login:setName', (name) => {
     socket.data.name = (name || 'Player').slice(0, 20);
-    console.log("2");
   });
 
   // oda listesi
@@ -186,7 +421,7 @@ io.on('connection', (socket) => {
       name: roomName || 'ROOM',
       capacity: Math.max(2, Math.min(6, +capacity || 4)),
       isPrivate: !!isPrivate,
-      state: { landData: [], started: false },
+      state: { landData: [], unitData: [], started: false },
       players: [],
     };
     rooms.set(code, room);
@@ -219,18 +454,41 @@ io.on('connection', (socket) => {
     if (!room) return;
 
     if (!room.state.started) {
-      if (Array.isArray(landData) && landData.length) {
+      const playerCount = room.players.length;
+      console.log(`[GAME START] Starting game in room ${code} with ${playerCount} players`);
+      
+      // Select appropriate map based on player count
+      const selectedMap = selectMapForPlayerCount(playerCount);
+      
+      if (selectedMap && selectedMap.length > 0) {
+        room.state.landData = selectedMap;
+        console.log(`[GAME START] Loaded map with ${selectedMap.length} tiles for ${playerCount} players`);
+      } else if (Array.isArray(landData) && landData.length) {
+        // Fallback to client-provided landData if available
         room.state.landData = landData;
+        console.log(`[GAME START] Using client-provided landData as fallback`);
+      } else {
+        console.warn(`[GAME START] No map data available, using empty state`);
+        room.state.landData = [];
       }
+      
+      // Initialize castle distribution after map is loaded
+      if (room.state.landData && room.state.landData.length > 0) {
+        console.log(`[GAME START] Initializing castle distribution for room ${code}`);
+        initializeCastleDistribution(room.state);
+        console.log(`[GAME START] Castle distribution completed for room ${code}`);
+      }
+      
       room.state.started = true;
+      console.log(`[GAME START] Broadcasting game initialization to room ${code}`);
       io.to(code).emit('game:init', { state: room.state });
     } else {
+      console.log(`[GAME START] Game already started in room ${code}, sending current state to player`);
       socket.emit('game:init', { state: room.state });
     }
   });
   // odadan çık
   socket.on('room:leave', () => {
-    console.log("room leave çalıştı");
     const code = socket.data.roomCode;
     if (!code) return;
     const room = rooms.get(code);
@@ -238,7 +496,7 @@ io.on('connection', (socket) => {
 
     socket.leave(code);
     room.players = room.players.filter(p => p.id !== socket.id);
-    console.log(room.players);
+    
     if (room.players.length === 0) {
       rooms.delete(code);
       console.log(`Room ${code} deleted (empty)`);
@@ -253,8 +511,126 @@ io.on('connection', (socket) => {
     const code = socket.data.roomCode;
     const room = rooms.get(code);
     if (!room || !room.state.started) return;
-    setLandOwner(room.state, { row, col }, owner);
+    
+    console.log(`Land capture: (${row}, ${col}) changing to owner ${owner}`);
+    // Use structure destruction function for soldier-initiated land capture
+    captureLandWithStructureDestruction(room.state, { row, col }, owner);
+    
+    // Trigger castle redistribution after ownership change
+    console.log(`[CASTLE] Triggering castle redistribution after land capture at (${row}, ${col})`);
+    distributeCastles(room.state);
+    
     io.to(code).emit('game:update', { landData: room.state.landData });
+  });
+
+  // building construction (towers, houses, etc.)
+  socket.on('action:buildStructure', ({ row, col, buildingType }) => {
+    const code = socket.data.roomCode;
+    const room = rooms.get(code);
+    if (!room || !room.state.started) return;
+    
+    console.log(`Building construction: ${buildingType} at (${row}, ${col})`);
+    
+    // Add building to the specified tile
+    room.state.landData = room.state.landData.map(line => {
+      const parts = ('' + line).trim().split(/\s+/);
+      const [r, c, owner, ...rest] = parts;
+      if (+r === row && +c === col) {
+        // Remove any existing building and add the new one
+        const filtered = rest.filter(tok => 
+          tok !== 'castle' && tok !== 'house' && tok !== 'tower' && tok !== 'strong_tower'
+        );
+        return `${r} ${c} ${owner} ${buildingType} ${filtered.join(' ')}`.trim();
+      }
+      return line;
+    });
+    
+    io.to(code).emit('game:update', { landData: room.state.landData });
+  });
+
+  // unit building
+  socket.on('action:buildUnit', ({ row, col, unitType }) => {
+    const code = socket.data.roomCode;
+    const room = rooms.get(code);
+    if (!room || !room.state.started) return;
+    
+    console.log(`Building unit ${unitType} at ${row},${col}`);
+    
+    // Initialize unitData if it doesn't exist
+    if (!room.state.unitData) {
+      room.state.unitData = [];
+    }
+    
+    // Add unit to the specified tile
+    const unitEntry = `${row} ${col} 1 ${unitType}`; // owner=1 for now, should be dynamic
+    room.state.unitData.push(unitEntry);
+    
+    io.to(code).emit('game:update', { 
+      landData: room.state.landData,
+      unitData: room.state.unitData
+    });
+  });
+
+  // unit movement
+  socket.on('action:move', ({ from, to, unitType }) => {
+    const code = socket.data.roomCode;
+    const room = rooms.get(code);
+    if (!room || !room.state.started) return;
+    
+    console.log(`Moving unit from ${from.row},${from.col} to ${to.row},${to.col}`);
+    
+    // Initialize unitData if it doesn't exist
+    if (!room.state.unitData) {
+      room.state.unitData = [];
+    }
+    
+    // Update unit position
+    room.state.unitData = room.state.unitData.map(line => {
+      const [r, c, owner, type] = line.trim().split(/\s+/);
+      if (parseInt(r) === from.row && parseInt(c) === from.col) {
+        return `${to.row} ${to.col} ${owner} ${type}`;
+      }
+      return line;
+    });
+    
+    io.to(code).emit('game:update', { 
+      landData: room.state.landData,
+      unitData: room.state.unitData
+    });
+  });
+
+  // unit attack
+  socket.on('action:attack', ({ attacker, target, attackerType }) => {
+    const code = socket.data.roomCode;
+    const room = rooms.get(code);
+    if (!room || !room.state.started) return;
+    
+    console.log(`Unit attack from ${attacker.row},${attacker.col} to ${target.row},${target.col}`);
+    
+    // Initialize unitData if it doesn't exist
+    if (!room.state.unitData) {
+      room.state.unitData = [];
+    }
+    
+    // Remove the target unit (defender is defeated)
+    room.state.unitData = room.state.unitData.filter(line => {
+      const [r, c] = line.trim().split(/\s+/);
+      return !(parseInt(r) === target.row && parseInt(c) === target.col);
+    });
+    
+    // Move the attacker to the target position
+    room.state.unitData = room.state.unitData.map(line => {
+      const [r, c, owner, type] = line.trim().split(/\s+/);
+      if (parseInt(r) === attacker.row && parseInt(c) === attacker.col) {
+        return `${target.row} ${target.col} ${owner} ${type}`;
+      }
+      return line;
+    });
+    
+    io.to(code).emit('game:update', { 
+      landData: room.state.landData,
+      unitData: room.state.unitData
+    });
   });
 
   socket.on('disconnect', () => {
